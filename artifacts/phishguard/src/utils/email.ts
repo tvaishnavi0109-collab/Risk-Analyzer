@@ -1,6 +1,6 @@
 // Email scanner detection logic.
 // Looks for fake authority tone, spoofed domains, suspicious links/attachments,
-// and basic grammar anomalies.
+// job scam patterns, and basic grammar anomalies.
 
 import {
   clamp,
@@ -47,9 +47,10 @@ const ATTACHMENT_HINTS = [
 ];
 
 const URL_PATTERN = /https?:\/\/[^\s]+/gi;
-const EMAIL_PATTERN = /\b[a-zA-Z0-9._%+-]+@([a-zA-Z0-9.-]+\.[a-zA-Z]{2,})\b/g;
+const EMAIL_PATTERN =
+  /\b[a-zA-Z0-9._%+-]+@([a-zA-Z0-9.-]+\.[a-zA-Z]{2,})\b/g;
 
-// Domains that are commonly spoofed via lookalikes
+// Domains commonly spoofed
 const SPOOF_TARGETS = [
   "paypal.com",
   "apple.com",
@@ -60,11 +61,20 @@ const SPOOF_TARGETS = [
   "facebook.com",
 ];
 
+const JOB_SCAM_PATTERNS = [
+  "internship",
+  "induction",
+  "selection process",
+  "submit your resume",
+  "upload resume",
+  "hiring process",
+];
+
 const WEIGHTS = {
-  authority: 12, // per phrase, capped
-  urgency: 10, // per phrase, capped
+  authority: 12,
+  urgency: 10,
   attachment: 25,
-  suspiciousLink: 20,
+  suspiciousLink: 30, // increased
   spoofedDomain: 35,
   grammar: 8,
 };
@@ -78,43 +88,36 @@ function findMatches(text: string, list: string[]): string[] {
   return list.filter((p) => lower.includes(p));
 }
 
-// Rough grammar heuristic: count obvious issues like double spaces, ALL CAPS
-// sentences, or repeated punctuation (!!!, ???). Not a real grammar check —
-// just enough to flag emails that "feel off".
 function grammarScore(text: string): number {
   let issues = 0;
   if (/\s{2,}/.test(text)) issues++;
   if (/[!?]{2,}/.test(text)) issues++;
-  // ALL CAPS words longer than 4 letters (excluding common ones)
   const capsWords = text.match(/\b[A-Z]{5,}\b/g) || [];
   if (capsWords.length >= 2) issues++;
-  // Missing space after punctuation
   if (/[.,!?][a-zA-Z]/.test(text)) issues++;
   return issues;
 }
 
-// Check if an email mentions a spoof-target domain but the actual sender uses
-// a different / lookalike domain. Example: "from: support@paypa1.com" and
-// the body talks about PayPal.
 function detectSpoofedDomain(text: string): string | null {
   const lower = text.toLowerCase();
   const mentioned = SPOOF_TARGETS.find((d) =>
-    lower.includes(d.replace(".com", "")),
+    lower.includes(d.replace(".com", ""))
   );
   if (!mentioned) return null;
 
   const senderDomains: string[] = [];
   let m: RegExpExecArray | null;
   EMAIL_PATTERN.lastIndex = 0;
+
   while ((m = EMAIL_PATTERN.exec(text)) !== null) {
     if (m[1]) senderDomains.push(m[1].toLowerCase());
   }
 
-  // If the email body mentions, say, "PayPal" but the sender domain is not
-  // paypal.com, that is a strong spoof signal.
   if (senderDomains.length === 0) return null;
+
   const matchesReal = senderDomains.some((d) => d === mentioned);
   if (matchesReal) return null;
+
   return mentioned;
 }
 
@@ -123,7 +126,7 @@ export function analyzeEmail(text: string): EmailScanResult {
   const warnings: string[] = [];
   let score = 0;
 
-  // Rule 1: Fake authority tone
+  // Rule 1: Authority tone
   const authority = findMatches(text, AUTHORITY_PHRASES);
   if (authority.length > 0) {
     score += Math.min(authority.length, 3) * WEIGHTS.authority;
@@ -144,7 +147,7 @@ export function analyzeEmail(text: string): EmailScanResult {
     warnings.push("This email pressures you to act quickly — slow down.");
   }
 
-  // Rule 3: Suspicious attachments
+  // Rule 3: Attachments
   const attachments = findMatches(text, ATTACHMENT_HINTS);
   if (attachments.length > 0) {
     score += WEIGHTS.attachment;
@@ -155,27 +158,42 @@ export function analyzeEmail(text: string): EmailScanResult {
     warnings.push("Do not open attachments unless you trust the sender.");
   }
 
-  // Rule 4: Suspicious links
+  // Rule 4: Links
   const links = text.match(URL_PATTERN) || [];
   if (links.length > 0) {
     const shortener = links.find((l) =>
-      /(bit\.ly|tinyurl|t\.co|goo\.gl|ow\.ly|is\.gd|rb\.gy)/i.test(l),
+      /(bit\.ly|tinyurl|t\.co|goo\.gl|ow\.ly|is\.gd|rb\.gy)/i.test(l)
     );
+
+    const googleForm = links.find((l) =>
+      /(forms\.gle|docs\.google\.com\/forms)/i.test(l)
+    );
+
     if (shortener) {
       score += WEIGHTS.suspiciousLink;
       reasons.push({
         type: "bad",
         text: `Contains shortened link: ${shortener}`,
       });
-    } else {
+    }
+
+    if (googleForm) {
+      score += 25;
+      reasons.push({
+        type: "bad",
+        text: "Uses external Google Form for application (common scam tactic)",
+      });
+    }
+
+    if (!shortener && !googleForm) {
       reasons.push({
         type: "warn",
-        text: `Contains ${links.length} link(s) — hover before clicking`,
+        text: `Contains ${links.length} link(s) — verify before clicking`,
       });
     }
   }
 
-  // Rule 5: Domain spoofing
+  // Rule 5: Spoofing
   const spoof = detectSpoofedDomain(text);
   if (spoof) {
     score += WEIGHTS.spoofedDomain;
@@ -183,10 +201,10 @@ export function analyzeEmail(text: string): EmailScanResult {
       type: "bad",
       text: `Mentions ${spoof} but sender domain does not match — possible spoof`,
     });
-    warnings.push(`Verify the sender address before trusting this email.`);
+    warnings.push("Verify sender email carefully.");
   }
 
-  // Rule 6: Grammar anomalies
+  // Rule 6: Grammar
   const issues = grammarScore(text);
   if (issues >= 2) {
     score += issues * WEIGHTS.grammar;
@@ -194,6 +212,53 @@ export function analyzeEmail(text: string): EmailScanResult {
       type: "warn",
       text: `Grammar / formatting anomalies detected (${issues} issues)`,
     });
+  }
+
+  // Rule 7: Job scam patterns
+  const job = findMatches(text, JOB_SCAM_PATTERNS);
+  if (job.length > 0) {
+    score += 15;
+    reasons.push({
+      type: "warn",
+      text: "Generic hiring / internship language detected",
+    });
+  }
+
+  // Rule 8: Combo logic (🔥 important)
+  const hasJobLanguage = /(internship|hiring|selection|induction)/i.test(text);
+  const hasExternalForm = /(forms\.gle|docs\.google\.com)/i.test(text);
+  const hasUrgency = /(today|urgent|immediately|mandatory)/i.test(text);
+
+  if (hasJobLanguage && hasExternalForm) {
+    score += 25;
+    reasons.push({
+      type: "warn",
+      text: "Hiring process uses external form (common scam pattern)",
+    });
+  }
+
+  if (hasJobLanguage && hasUrgency) {
+    score += 20;
+    reasons.push({
+      type: "warn",
+      text: "Job-related message with urgency pressure",
+    });
+  }
+
+  // Rule 9: Unrealistic hiring
+  if (/no interview|direct selection|guaranteed/i.test(text)) {
+    score += 25;
+    reasons.push({
+      type: "bad",
+      text: "Unrealistic hiring promise (no interview / direct selection)",
+    });
+  }
+
+  // Extra warning (context awareness)
+  if (hasJobLanguage && links.length > 0 && !spoof) {
+    warnings.push(
+      "Job-related email with external links — verify legitimacy independently."
+    );
   }
 
   if (reasons.length === 0) {
@@ -204,6 +269,7 @@ export function analyzeEmail(text: string): EmailScanResult {
   }
 
   score = clamp(Math.round(score), 0, 100);
+
   return {
     score,
     level: levelFromScore(score),
