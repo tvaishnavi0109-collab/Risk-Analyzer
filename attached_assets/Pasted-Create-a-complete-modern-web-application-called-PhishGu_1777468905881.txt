@@ -1,0 +1,150 @@
+Create a complete modern web application called **PhishGuard** using **Vite + React + TypeScript** with a clean, professional folder structure.
+
+---
+
+## 🎯 Goal:
+
+Build a **Multi-Vector Phishing Detection System** that can analyze:
+
+1. 🌐 Websites (URLs)
+2. 💬 Messages (SMS / text)
+3. 📧 Emails
+
+All analysis should be **client-side only (no backend)**.
+
+---
+
+## 🧩 App Structure:
+
+### 1. Landing Page (Home)
+
+* Title: **PhishGuard**
+* Subtitle: "Multi-Vector Phishing Detection System"
+* Dark theme UI (blue/purple gradient)
+* Display 3 large cards/buttons:
+
+  * 🌐 Website Scanner
+  * 💬 Message Scanner
+  * 📧 Email Scanner
+
+Each card:
+
+* Has icon + title + short description
+* Smooth hover animation
+* Navigates to its respective page
+
+---
+
+## 🌐 Website Scanner Page
+
+* Input field for URL
+* "Analyze" button
+* Output:
+
+  * Risk Score (0–100%)
+  * Risk Level (Low / Medium / High)
+  * Detected Domain
+  * Reasons list
+
+Detection logic:
+
+* Suspicious keywords (login, verify, secure, update)
+* URL shorteners (bit.ly, tinyurl)
+* IP address instead of domain
+* Too many subdomains
+* Non-HTTPS URLs
+
+---
+
+## 💬 Message Scanner Page
+
+* Textarea input
+* Analyze button
+
+Detection logic:
+
+* Urgency words (urgent, now, immediately)
+* Financial bait (win, prize, free money)
+* Suspicious links
+* Request for OTP/password/bank info
+
+Output:
+
+* Risk score
+* Risk level
+* Highlight suspicious phrases
+* Reasons list
+
+---
+
+## 📧 Email Scanner Page
+
+* Textarea input for email content
+
+Detection logic:
+
+* Fake authority tone (bank, government, security alert)
+* Suspicious links or attachments
+* Grammar anomalies (basic heuristic)
+* Domain spoofing patterns
+
+Output:
+
+* Risk score
+* Risk level
+* Reasons list
+* Warning messages
+
+---
+
+## ⚙️ Technical Requirements:
+
+* Use React with functional components
+* Use TypeScript
+* Use reusable components (Card, Button, Input, Badge)
+* Use React Router for navigation
+* Use hooks for state management
+* Keep detection logic modular (separate utility functions)
+
+---
+
+## 📁 Folder Structure:
+
+* /src
+
+  * /components
+
+    * /ui (buttons, cards, inputs, badges)
+  * /pages (Home, Website, Message, Email)
+  * /utils (detection logic functions)
+  * App.tsx
+  * main.tsx
+
+---
+
+## 🎨 UI/UX:
+
+* Dark theme
+* Smooth animations
+* Modern cybersecurity feel
+* Responsive design
+
+---
+
+## ⭐ Extra Features:
+
+* Loading animation on analyze
+* Back navigation or navbar
+* Disclaimer: "This is a demo tool and not a replacement for real security systems"
+
+---
+
+## ⚠️ Important:
+
+* Do NOT include backend
+* Do NOT include unnecessary dependencies
+* Keep code clean, beginner-friendly, and well-structured
+
+---
+
+Generate the **complete working project with all files and code ready to run using npm install and npm run dev**.
