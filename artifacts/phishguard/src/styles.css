@@ -186,6 +186,33 @@ body {
   border-color: rgba(239, 68, 68, 0.4);
 }
 
+/* Detected domain row */
+.domain-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 12px 14px;
+  background: #0f172a;
+  border: 1px solid #334155;
+  border-radius: 10px;
+  margin-bottom: 18px;
+}
+
+.domain-label {
+  font-size: 13px;
+  color: #94a3b8;
+  font-weight: 500;
+}
+
+.domain-value {
+  font-family: 'Inter', monospace;
+  font-size: 15px;
+  color: #f1f5f9;
+  font-weight: 600;
+  word-break: break-all;
+}
+
 /* Risk score block */
 .score-block {
   margin-bottom: 22px;

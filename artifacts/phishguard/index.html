@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>PhishGuard - URL Risk Analyzer</title>
+    <title>PhishGuard – URL Risk Analyzer by Vaishnavi</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -16,7 +16,7 @@
           <span class="shield">&#128737;</span>
         </div>
         <h1>PhishGuard</h1>
-        <p class="subtitle">URL Risk Analyzer</p>
+        <p class="subtitle">URL Risk Analyzer by Vaishnavi</p>
       </header>
 
       <section class="card">
@@ -39,6 +39,11 @@
           <span id="risk-badge" class="badge"></span>
         </div>
 
+        <div class="domain-row">
+          <span class="domain-label">Detected Domain:</span>
+          <span id="detected-domain" class="domain-value"></span>
+        </div>
+
         <div class="score-block">
           <div class="score-row">
             <span class="score-label">Risk Score</span>
@@ -51,13 +56,6 @@
 
         <h3 class="reasons-title">Reasons</h3>
         <ul id="reasons-list" class="reasons"></ul>
-      </section>
-
-      <section class="card awareness">
-        <p>
-          This tool uses rule-based phishing detection techniques such as URL
-          analysis, inspired by cybersecurity awareness practices.
-        </p>
       </section>
 
       <footer class="footer">

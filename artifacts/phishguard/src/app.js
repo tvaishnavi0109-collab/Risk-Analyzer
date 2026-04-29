@@ -4,7 +4,14 @@
 // ---- Configuration ----
 
 // Words commonly found in phishing URLs trying to impersonate trusted services
-const SUSPICIOUS_KEYWORDS = ['login', 'verify', 'secure', 'account'];
+const SUSPICIOUS_KEYWORDS = [
+  'login',
+  'verify',
+  'secure',
+  'account',
+  'update',
+  'signin',
+];
 
 // If the URL is longer than this, we consider it suspicious
 const LONG_URL_LIMIT = 75;
@@ -21,6 +28,7 @@ const WEIGHTS = {
   longUrl: 15,       // URL is too long
   manyHyphens: 10,   // URL has too many hyphens
   ipAddress: 45,     // URL uses an IP address instead of a domain
+  atSymbol: 30,      // URL contains "@" which can hide the real destination
 };
 
 // ---- Helpers ----
@@ -36,16 +44,38 @@ function countHyphens(url) {
   return (url.match(/-/g) || []).length;
 }
 
-// Check if the URL contains an IPv4 address (e.g., 192.168.1.1)
-// We strip the protocol first, then look at the host part before any "/".
-function containsIpAddress(url) {
-  // Remove "http://" or "https://" if present
+// Get the host portion of a URL (the part after the protocol, before the path).
+// Example: "https://example.com/login?x=1" -> "example.com"
+function getHost(url) {
   const withoutProtocol = url.replace(/^https?:\/\//i, '');
-  // The host is everything before the first "/" or ":"
-  const host = withoutProtocol.split(/[/:?#]/)[0];
+  // If the URL has an "@" (like user@host), take the part AFTER it as the host
+  const afterAt = withoutProtocol.includes('@')
+    ? withoutProtocol.split('@').pop()
+    : withoutProtocol;
+  // Host is everything before the first "/", "?", "#", or ":"
+  return afterAt.split(/[/:?#]/)[0];
+}
+
+// Extract the main domain (e.g., "https://www.example.com/foo" -> "example.com")
+// We drop a leading "www." but otherwise return the host as-is so the user
+// can see the exact domain being analyzed.
+function extractDomain(url) {
+  const host = getHost(url).toLowerCase();
+  if (!host) return 'unknown';
+  return host.replace(/^www\./, '');
+}
+
+// Check if the URL contains an IPv4 address (e.g., 192.168.1.1)
+function containsIpAddress(url) {
+  const host = getHost(url);
   // Match four numbers (0-255) separated by dots
   const ipPattern = /^(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}$/;
   return ipPattern.test(host);
+}
+
+// Check if the URL contains an "@" symbol (often used to hide the real host)
+function containsAtSymbol(url) {
+  return url.includes('@');
 }
 
 // Keep a number inside a min/max range
@@ -55,7 +85,7 @@ function clamp(value, min, max) {
 
 // ---- Main analyzer ----
 
-// Returns: { score: number (0-100), level: string, reasons: [{type, text}] }
+// Returns: { score, level, reasons, domain }
 function analyzeUrl(url) {
   const reasons = [];
   let score = 0;
@@ -80,7 +110,18 @@ function analyzeUrl(url) {
     });
   }
 
-  // Rule 3: Suspicious keywords
+  // Rule 3: "@" symbol check
+  // Attackers use "@" to make a URL look legitimate while sending you elsewhere.
+  // Example: https://google.com@evil.com actually goes to evil.com
+  if (containsAtSymbol(url)) {
+    score += WEIGHTS.atSymbol;
+    reasons.push({
+      type: 'bad',
+      text: 'URL contains @ symbol which can hide real destination',
+    });
+  }
+
+  // Rule 4: Suspicious keywords
   const foundKeywords = findSuspiciousKeywords(url);
   if (foundKeywords.length > 0) {
     // Cap the keyword penalty so dozens of matches don't blow up the score
@@ -97,7 +138,7 @@ function analyzeUrl(url) {
     });
   }
 
-  // Rule 4: URL length
+  // Rule 5: URL length
   if (url.length > LONG_URL_LIMIT) {
     score += WEIGHTS.longUrl;
     reasons.push({
@@ -111,7 +152,7 @@ function analyzeUrl(url) {
     });
   }
 
-  // Rule 5: Hyphen count
+  // Rule 6: Hyphen count
   const hyphens = countHyphens(url);
   if (hyphens > MAX_HYPHENS) {
     score += WEIGHTS.manyHyphens;
@@ -139,7 +180,10 @@ function analyzeUrl(url) {
     level = 'High Risk';
   }
 
-  return { score, level, reasons };
+  // Pull out the main domain so we can show it in the UI
+  const domain = extractDomain(url);
+
+  return { score, level, reasons, domain };
 }
 
 // Map a level to a CSS class used for badge + score bar colors
@@ -159,6 +203,7 @@ const riskBadge = document.getElementById('risk-badge');
 const riskScore = document.getElementById('risk-score');
 const scoreBarFill = document.getElementById('score-bar-fill');
 const reasonsList = document.getElementById('reasons-list');
+const detectedDomain = document.getElementById('detected-domain');
 
 // Show an error message under the input
 function showError(message) {
@@ -176,6 +221,9 @@ function clearError() {
 // Render the analysis result on the page
 function renderResult(result) {
   const cls = levelClass(result.level);
+
+  // Detected domain
+  detectedDomain.textContent = result.domain;
 
   // Risk badge
   riskBadge.textContent = result.level;
