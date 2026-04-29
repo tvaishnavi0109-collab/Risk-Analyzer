@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>PhishGuard - URL Risk Analyzer</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/src/styles.css" />
+  </head>
+  <body>
+    <main class="container">
+      <header class="header">
+        <div class="logo">
+          <span class="shield">&#128737;</span>
+        </div>
+        <h1>PhishGuard</h1>
+        <p class="subtitle">URL Risk Analyzer</p>
+      </header>
+
+      <section class="card">
+        <label for="url-input" class="label">Enter a URL to analyze</label>
+        <div class="input-row">
+          <input
+            id="url-input"
+            type="text"
+            placeholder="https://example.com/login"
+            autocomplete="off"
+          />
+          <button id="analyze-btn" type="button">Analyze</button>
+        </div>
+        <p id="error-message" class="error" hidden></p>
+      </section>
+
+      <section id="result" class="result" hidden>
+        <div class="result-header">
+          <h2>Risk Level:</h2>
+          <span id="risk-badge" class="badge"></span>
+        </div>
+        <h3 class="reasons-title">Reasons:</h3>
+        <ul id="reasons-list" class="reasons"></ul>
+      </section>
+
+      <footer class="footer">
+        <p>A simple beginner-friendly demo. Not a substitute for real security tools.</p>
+      </footer>
+    </main>
+
+    <script src="/src/app.js"></script>
+  </body>
+</html>
