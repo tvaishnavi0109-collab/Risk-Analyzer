@@ -60,11 +60,20 @@ const SUSPICIOUS_LINK_HOSTS = [
   "shorturl.at",
 ];
 
+const MONEY_PATTERNS = [
+  "rupees",
+  "₹",
+  "rs",
+  "cash",
+  "earn",
+  "income",
+];
+
 const WEIGHTS = {
   urgency: 12, // per matched word, capped
   financialBait: 14, // per matched word, capped
   credentialRequest: 25, // per matched phrase, capped
-  suspiciousLink: 25,
+  suspiciousLink: 40,
   anyLink: 8,
 };
 
@@ -106,7 +115,18 @@ export function analyzeMessage(text: string): MessageScanResult {
     });
   }
 
-  // Rule 3: Credential / OTP requests
+  // Rule 3: Money bait (NEW 🔥)
+const money = findMatches(text, MONEY_PATTERNS);
+if (money.length > 0) {
+  matches.push(...money);
+  score += 20;
+  reasons.push({
+    type: "bad",
+    text: `Money-related bait detected: ${money.join(", ")}`,
+  });
+}
+
+  // Rule 4: Credential / OTP requests
   const creds = findMatches(text, CREDENTIAL_REQUESTS);
   if (creds.length > 0) {
     matches.push(...creds);
@@ -118,7 +138,7 @@ export function analyzeMessage(text: string): MessageScanResult {
     });
   }
 
-  // Rule 4: Links inside the message
+  // Rule 5: Links inside the message
   const links: string[] = text.match(URL_PATTERN) ?? [];
   if (links.length > 0) {
     score += WEIGHTS.anyLink;
@@ -149,7 +169,16 @@ export function analyzeMessage(text: string): MessageScanResult {
       text: "No common phishing patterns detected in this message",
     });
   }
-
+  if (
+    /(rupees|₹|rs|cash)/i.test(text) &&
+    /(bit\.ly|tinyurl|shorturl|t\.co)/i.test(text)
+  ) {
+    score += 35;
+    reasons.push({
+      type: "bad",
+      text: "Money + shortened link combination (very high risk)",
+    });
+  }
   score = clamp(Math.round(score), 0, 100);
   return {
     score,
