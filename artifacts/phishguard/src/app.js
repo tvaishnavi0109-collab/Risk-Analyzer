@@ -1,5 +1,5 @@
 // PhishGuard - URL Risk Analyzer
-// Simple, beginner-friendly URL risk analysis using basic rules.
+// Beginner-friendly URL risk analysis using simple weighted rules.
 
 // ---- Configuration ----
 
@@ -11,6 +11,17 @@ const LONG_URL_LIMIT = 75;
 
 // More than this many hyphens looks suspicious
 const MAX_HYPHENS = 3;
+
+// Each rule contributes some points to the total risk score (out of 100).
+// We tune these weights so a single big issue (like an IP address) is enough
+// to push the URL into the high-risk zone.
+const WEIGHTS = {
+  noHttps: 25,       // URL does not use HTTPS
+  keyword: 12,       // Each suspicious keyword found (capped below)
+  longUrl: 15,       // URL is too long
+  manyHyphens: 10,   // URL has too many hyphens
+  ipAddress: 45,     // URL uses an IP address instead of a domain
+};
 
 // ---- Helpers ----
 
@@ -25,25 +36,56 @@ function countHyphens(url) {
   return (url.match(/-/g) || []).length;
 }
 
+// Check if the URL contains an IPv4 address (e.g., 192.168.1.1)
+// We strip the protocol first, then look at the host part before any "/".
+function containsIpAddress(url) {
+  // Remove "http://" or "https://" if present
+  const withoutProtocol = url.replace(/^https?:\/\//i, '');
+  // The host is everything before the first "/" or ":"
+  const host = withoutProtocol.split(/[/:?#]/)[0];
+  // Match four numbers (0-255) separated by dots
+  const ipPattern = /^(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}$/;
+  return ipPattern.test(host);
+}
+
+// Keep a number inside a min/max range
+function clamp(value, min, max) {
+  return Math.max(min, Math.min(max, value));
+}
+
 // ---- Main analyzer ----
 
-// Returns an object: { level: 'Safe' | 'Suspicious' | 'High Risk', reasons: [...] }
+// Returns: { score: number (0-100), level: string, reasons: [{type, text}] }
 function analyzeUrl(url) {
   const reasons = [];
+  let score = 0;
 
-  // Rule 1: Check if URL starts with https
+  // Rule 1: HTTPS check
   if (url.toLowerCase().startsWith('https://')) {
     reasons.push({ type: 'good', text: 'Uses HTTPS (secure connection)' });
   } else {
+    score += WEIGHTS.noHttps;
     reasons.push({
       type: 'bad',
       text: 'Does not use HTTPS (connection is not secure)',
     });
   }
 
-  // Rule 2: Check for suspicious keywords (login, verify, secure, account)
+  // Rule 2: IP address check (big risk increase)
+  if (containsIpAddress(url)) {
+    score += WEIGHTS.ipAddress;
+    reasons.push({
+      type: 'bad',
+      text: 'Uses IP address instead of domain',
+    });
+  }
+
+  // Rule 3: Suspicious keywords
   const foundKeywords = findSuspiciousKeywords(url);
   if (foundKeywords.length > 0) {
+    // Cap the keyword penalty so dozens of matches don't blow up the score
+    const keywordPoints = Math.min(foundKeywords.length, 3) * WEIGHTS.keyword;
+    score += keywordPoints;
     reasons.push({
       type: 'warn',
       text: `Contains suspicious keyword(s): ${foundKeywords.join(', ')}`,
@@ -55,8 +97,9 @@ function analyzeUrl(url) {
     });
   }
 
-  // Rule 3: Check if URL is too long
+  // Rule 4: URL length
   if (url.length > LONG_URL_LIMIT) {
+    score += WEIGHTS.longUrl;
     reasons.push({
       type: 'warn',
       text: `URL is very long (${url.length} characters)`,
@@ -68,9 +111,10 @@ function analyzeUrl(url) {
     });
   }
 
-  // Rule 4: Check for too many hyphens
+  // Rule 5: Hyphen count
   const hyphens = countHyphens(url);
   if (hyphens > MAX_HYPHENS) {
+    score += WEIGHTS.manyHyphens;
     reasons.push({
       type: 'warn',
       text: `Contains many hyphens (${hyphens} found)`,
@@ -82,22 +126,27 @@ function analyzeUrl(url) {
     });
   }
 
-  // ---- Decide overall risk level ----
-  // Count how many warnings/bad signals we found
-  const badCount = reasons.filter((r) => r.type === 'bad').length;
-  const warnCount = reasons.filter((r) => r.type === 'warn').length;
-  const totalIssues = badCount + warnCount;
+  // Keep the score between 0 and 100
+  score = clamp(Math.round(score), 0, 100);
 
+  // Convert score to a level
   let level;
-  if (totalIssues === 0) {
-    level = 'Safe';
-  } else if (totalIssues <= 2) {
+  if (score <= 40) {
+    level = 'Likely Safe';
+  } else if (score <= 70) {
     level = 'Suspicious';
   } else {
     level = 'High Risk';
   }
 
-  return { level, reasons };
+  return { score, level, reasons };
+}
+
+// Map a level to a CSS class used for badge + score bar colors
+function levelClass(level) {
+  if (level === 'Likely Safe') return 'safe';
+  if (level === 'Suspicious') return 'suspicious';
+  return 'high-risk';
 }
 
 // ---- DOM wiring ----
@@ -107,6 +156,8 @@ const analyzeBtn = document.getElementById('analyze-btn');
 const errorMessage = document.getElementById('error-message');
 const resultSection = document.getElementById('result');
 const riskBadge = document.getElementById('risk-badge');
+const riskScore = document.getElementById('risk-score');
+const scoreBarFill = document.getElementById('score-bar-fill');
 const reasonsList = document.getElementById('reasons-list');
 
 // Show an error message under the input
@@ -124,14 +175,20 @@ function clearError() {
 
 // Render the analysis result on the page
 function renderResult(result) {
-  // Set the risk badge text and color
-  riskBadge.textContent = result.level;
-  riskBadge.className = 'badge';
-  if (result.level === 'Safe') riskBadge.classList.add('safe');
-  if (result.level === 'Suspicious') riskBadge.classList.add('suspicious');
-  if (result.level === 'High Risk') riskBadge.classList.add('high-risk');
+  const cls = levelClass(result.level);
 
-  // Build the list of reasons
+  // Risk badge
+  riskBadge.textContent = result.level;
+  riskBadge.className = 'badge ' + cls;
+
+  // Risk score number
+  riskScore.textContent = result.score + '%';
+
+  // Risk score bar
+  scoreBarFill.className = 'score-bar-fill ' + cls;
+  scoreBarFill.style.width = result.score + '%';
+
+  // Reasons list
   reasonsList.innerHTML = '';
   result.reasons.forEach((reason) => {
     const li = document.createElement('li');

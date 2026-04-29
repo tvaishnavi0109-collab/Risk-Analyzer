@@ -6,7 +6,7 @@
     <title>PhishGuard - URL Risk Analyzer</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/src/styles.css" />
   </head>
   <body>
@@ -33,13 +33,31 @@
         <p id="error-message" class="error" hidden></p>
       </section>
 
-      <section id="result" class="result" hidden>
+      <section id="result" class="card result" hidden>
         <div class="result-header">
-          <h2>Risk Level:</h2>
+          <span class="result-label">Risk Level</span>
           <span id="risk-badge" class="badge"></span>
         </div>
-        <h3 class="reasons-title">Reasons:</h3>
+
+        <div class="score-block">
+          <div class="score-row">
+            <span class="score-label">Risk Score</span>
+            <span id="risk-score" class="score-value">0%</span>
+          </div>
+          <div class="score-bar">
+            <div id="score-bar-fill" class="score-bar-fill"></div>
+          </div>
+        </div>
+
+        <h3 class="reasons-title">Reasons</h3>
         <ul id="reasons-list" class="reasons"></ul>
+      </section>
+
+      <section class="card awareness">
+        <p>
+          This tool uses rule-based phishing detection techniques such as URL
+          analysis, inspired by cybersecurity awareness practices.
+        </p>
       </section>
 
       <footer class="footer">
